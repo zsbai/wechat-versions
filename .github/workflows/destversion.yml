@@ -8,7 +8,7 @@ on:
       download_link:
         description: 'The manual WechatSetup.exe download link'
         required: false
-        default: 'https://dldir1.qq.com/weixin/Windows/WeChatSetup.exe'
+        default: 'https://dldir1.qq.com/weixin/mac/WeChatMac.dmg'
 
 jobs:
   save_new_wechat:
@@ -20,4 +20,4 @@ jobs:
       - name: Check new version and push
         env: 
           GHTOKEN: ${{ secrets.GHTOKEN }}
-        run: bash -x ./scripts/destVersionRelease.sh ${{ github.event.inputs.download_link }}
+        run: sudo apt update && sudo apt install python3 python3-pip -y && pip install lxml requests && bash -x ./scripts/destVersionForMac.sh ${{ github.event.inputs.download_link }}
