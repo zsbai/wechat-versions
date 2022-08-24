@@ -99,7 +99,7 @@ function main() {
 
     now_sum256=`shasum -a 256 ${temp_path}/WeChatMac.dmg | awk '{print $1}'`
     local latest_sum256=`gh release view  --json body --jq ".body" | awk '/Sha256/{ print $2 }'`
-    local latest_sum256=`gh release view  --json body --jq ".body" | awk '/DestVersion/{ print $2 }'`
+    local latest_version=`gh release view  --json body --jq ".body" | awk '/DestVersion/{ print $2 }'`
 
     if [ "$now_sum256" = "$latest_sum256" ]; then
         >&2 echo -e "\n\033[1;32mThis is the newest Version!\033[0m\n"
