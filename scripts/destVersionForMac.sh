@@ -49,7 +49,7 @@ function download_wechat() {
     printf "#%.0s" {1..60}
     echo 
 
-    wget "$download_link" -O ${temp_path}/WeChatMac.dmg
+    wget -q "$download_link" -O ${temp_path}/WeChatMac.dmg
     if [ "$?" -ne 0 ]; then
         >&2 echo -e "\033[1;31mDownload Failed, please check your network!\033[0m"
         clean_data 1
@@ -110,8 +110,8 @@ function main() {
     prepare_commit
     # if dest_version is the same as latest_version
     if [ "$dest_version" = "$latest_version" ]; then
-        dest_version="$dest_version"_`date -u '+%Y%m%d%H%M%S'`
-        echo $dest_version
+        dest_version="$dest_version"_`date -u '+%Y%m%d'`
+        echo -e $dest_version
         clean_data 0
     fi
     gh release create v$dest_version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$dest_version"
