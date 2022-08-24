@@ -115,7 +115,7 @@ function main() {
         version="$dest_version"
     fi
     
-    gh release create v$version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$dest_version"
+    gh release create v$version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$version"
 
     # gh auth logout --hostname github.com | echo "y"
 
