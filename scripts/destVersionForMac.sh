@@ -57,7 +57,7 @@ function download_wechat() {
 }
 
 function get_version() {
-    dest_version=`python scripts/getVersion.py`
+    dest_version=`python3 scripts/getVersion.py`
 }
 
 
@@ -92,7 +92,7 @@ function clean_data() {
 function main() {
     # rm -rfv WeChatSetup/*
     mkdir -p ${temp_path}/temp
-    login_gh
+    # login_gh
     ## https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
     # install_depends
     download_wechat
@@ -100,7 +100,6 @@ function main() {
     now_sum256=`shasum -a 256 ${temp_path}/WeChatMac.dmg | awk '{print $1}'`
     local latest_sum256=`gh release view  --json body --jq ".body" | awk '/Sha256/{ print $2 }'`
     local latest_version=`gh release view  --json body --jq ".body" | awk '/DestVersion/{ print $2 }'`
-
     if [ "$now_sum256" = "$latest_sum256" ]; then
         >&2 echo -e "\n\033[1;32mThis is the newest Version!\033[0m\n"
         clean_data 0
@@ -110,13 +109,15 @@ function main() {
     prepare_commit
     # if dest_version is the same as latest_version
     if [ "$dest_version" = "$latest_version" ]; then
-        dest_version="$dest_version"_`date -u '+%Y%m%d'`
+        version="$dest_version"_`date -u '+%Y%m%d'`
         echo -e $dest_version
-        clean_data 0
+    else
+        version="$dest_version"
     fi
-    gh release create v$dest_version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$dest_version"
+    
+    gh release create v$version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$dest_version"
 
-    gh auth logout --hostname github.com | echo "y"
+    # gh auth logout --hostname github.com | echo "y"
 
     clean_data 0
 }
