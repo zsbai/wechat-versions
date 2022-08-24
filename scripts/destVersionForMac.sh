@@ -110,7 +110,8 @@ function main() {
     prepare_commit
     # if dest_version is the same as latest_version
     if [ "$dest_version" = "$latest_version" ]; then
-        dest_version="$dest_version"+"$(date -u '+%Y%m%d%H%M%S')"
+        dest_version="$dest_version"_`date -u '+%Y%m%d%H%M%S'`
+        echo $dest_version
         clean_data 0
     fi
     gh release create v$dest_version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$dest_version"
