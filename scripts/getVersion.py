@@ -10,5 +10,6 @@ header = {
 }
 r = requests.get(url,headers=header).text
 tree = lxml.etree.HTML(r)
-version = tree.xpath("/html/body/div/div[2]/div/div[1]/a[1]/div/p[2]/text()")
+version = tree.xpath("/html/body/div/div[2]/div/div[1]/a[1]/div/p[2]/text()[1]")
 print(version[0])
+

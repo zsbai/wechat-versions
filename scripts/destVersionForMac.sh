@@ -99,6 +99,7 @@ function main() {
 
     now_sum256=`shasum -a 256 ${temp_path}/WeChatMac.dmg | awk '{print $1}'`
     local latest_sum256=`gh release view  --json body --jq ".body" | awk '/Sha256/{ print $2 }'`
+    local latest_sum256=`gh release view  --json body --jq ".body" | awk '/DestVersion/{ print $2 }'`
 
     if [ "$now_sum256" = "$latest_sum256" ]; then
         >&2 echo -e "\n\033[1;32mThis is the newest Version!\033[0m\n"
@@ -107,7 +108,11 @@ function main() {
     ## if not the newest
     get_version
     prepare_commit
-
+    # if dest_version is the same as latest_version
+    if [ "$dest_version" = "$latest_version" ]; then
+        dest_version="$dest_version"+"$(date -u '+%Y%m%d%H%M%S')"
+        clean_data 0
+    fi
     gh release create v$dest_version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$dest_version"
 
     gh auth logout --hostname github.com | echo "y"
