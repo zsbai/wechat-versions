@@ -95,7 +95,8 @@ get_version() {
     }
 
     # 查找 Info.plist
-    INFO_PLIST=$(find "${TEMP_PATH}" -type f -name "Info.plist" | head -n 1)
+    # INFO_PLIST=$(find "${TEMP_PATH}" -type f -name "Info.plist" | head -n 1)
+    INFO_PLIST=${TEMP_PATH}/微信\ WeChat/WeChat.app/Contents/Info.plist
 
     if [ -z "$INFO_PLIST" ] || [ ! -f "$INFO_PLIST" ]; then
         echo_color "red" "Info.plist not found in the IMG!"
