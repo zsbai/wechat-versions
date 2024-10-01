@@ -2,125 +2,214 @@
 
 set -eo pipefail
 
-temp_path="WeChatMac/temp"
-latest_path="WeChatMac/latest"
+# ====================================================
+# 配置变量
+# ====================================================
+TEMP_PATH="WeChatMac/temp"
+DOWNLOAD_LINK="${1:-https://dldir1.qq.com/weixin/mac/WeChatMac.dmg}"
 
-download_link="$1"
-if [ -z "$1" ]; then
-    >&2 echo -e "Missing argument. Using default download link"
-    download_link="https://dldir1.qq.com/weixin/mac/WeChatMac.dmg"
-fi
+# ====================================================
+# 函数定义
+# ====================================================
 
-function install_depends() {
-    printf "#%.0s" {1..60}
-    echo 
-    echo -e "## \033[1;33mInstalling 7zip, shasum, wget, curl, git\033[0m"
-    printf "#%.0s" {1..60}
-    echo 
-
-    apt install -y p7zip-full p7zip-rar libdigest-sha-perl wget curl git python3 python3-pip
-    pip install lxml request
+# 打印分隔线
+print_separator() {
+    printf '%*s\n' 60 | tr ' ' '#'
 }
 
-function login_gh() {
-    printf "#%.0s" {1..60}
-    echo 
-    echo -e "## \033[1;33mLogin to github to use github-cli...\033[0m"
-    printf "#%.0s" {1..60}
-    echo 
-    if [ -z $GHTOKEN ]; then
-        >&2 echo -e "\033[1;31mMissing Github Token! Please get a BotToken from 'Github Settings->Developer settings->Personal access tokens' and set it in Repo Secrect\033[0m"
-        exit 1
-    fi
+# 彩色输出函数
+echo_color() {
+    local color="$1"
+    shift
+    local message="$*"
+    case "$color" in
+        yellow)
+            echo -e "\033[1;33m$message\033[0m"
+            ;;
+        red)
+            echo -e "\033[1;31m$message\033[0m" >&2
+            ;;
+        green)
+            echo -e "\033[1;32m$message\033[0m"
+            ;;
+        *)
+            echo "$message"
+            ;;
+    esac
+}
 
-    echo $GHTOKEN > WeChatMac/temp/GHTOKEN
-    gh auth login --with-token < WeChatMac/temp/GHTOKEN
+# 安装依赖项
+install_depends() {
+    print_separator
+    echo_color "yellow" "Installing dependencies: 7zip, wget, curl, git, gh, dmg2img, shasum"
+    print_separator
+
+    sudo apt update
+    sudo apt install -y p7zip-full p7zip-rar libdigest-sha-perl wget curl git gh dmg2img
+}
+
+# 下载 WeChat DMG
+download_wechat() {
+    print_separator
+    echo_color "yellow" "Downloading the newest WeChatMac..."
+    print_separator
+
+    mkdir -p "$TEMP_PATH"
+
+    wget -q "$DOWNLOAD_LINK" -O "${TEMP_PATH}/WeChatMac.dmg"
     if [ "$?" -ne 0 ]; then
-        >&2 echo -e "\033[1;31mLogin Failed, please check your network or token!\033[0m"
+        echo_color "red" "Download Failed, please check your network!"
         clean_data 1
     fi
-    rm -rfv WeChatMac/temp/GHTOKEN
 }
 
-function download_wechat() {
-    printf "#%.0s" {1..60}
-    echo 
-    echo -e "## \033[1;33mDownloading the newest WeChatMac...\033[0m"
-    printf "#%.0s" {1..60}
-    echo 
+# 从 Info.plist 提取版本信息
+get_version() {
+    print_separator
+    echo_color "yellow" "Extracting version from Info.plist..."
+    print_separator
 
-    wget -q "$download_link" -O ${temp_path}/WeChatMac.dmg
-    if [ "$?" -ne 0 ]; then
-        >&2 echo -e "\033[1;31mDownload Failed, please check your network!\033[0m"
+    # 使用 dmg2img 将 DMG 转换为 IMG
+    dmg2img "${TEMP_PATH}/WeChatMac.dmg" "${TEMP_PATH}/WeChatMac.img"
+
+    # 使用 7z x 解压 IMG 文件，保留目录结构
+    7z x "${TEMP_PATH}/WeChatMac.img" -o"${TEMP_PATH}" >/dev/null || {
+        echo_color "red" "Failed to extract IMG file."
+        clean_data 1
+    }
+
+    # 查找 Info.plist
+    # INFO_PLIST=$(find "${TEMP_PATH}" -type f -name "Info.plist" | head -n 1)
+    INFO_PLIST=${TEMP_PATH}/微信\ WeChat/WeChat.app/Contents/Info.plist
+
+    if [ -z "$INFO_PLIST" ] || [ ! -f "$INFO_PLIST" ]; then
+        echo_color "red" "Info.plist not found in the IMG!"
         clean_data 1
     fi
+
+    # 使用 grep 和 sed 提取版本号
+    VERSION=$(grep -A1 '<key>CFBundleShortVersionString</key>' "$INFO_PLIST" | grep '<string>' | sed -E 's/.*<string>([^<]+)<\/string>.*/\1/')
+
+    if [ -z "$VERSION" ]; then
+        VERSION=$(grep -A1 '<key>CFBundleVersion</key>' "$INFO_PLIST" | grep '<string>' | sed -E 's/.*<string>([^<]+)<\/string>.*/\1/')
+    fi
+
+    if [ -z "$VERSION" ]; then
+        echo_color "red" "Version information not found in Info.plist!"
+        clean_data 1
+    fi
+
+    echo "Version: $VERSION"
 }
 
-function get_version() {
-    dest_version=`python3 scripts/getVersion.py`
+# 计算 SHA256
+compute_sha256() {
+    local file_path="$1"
+    shasum -a 256 "$file_path" | awk '{print $1}'
 }
 
+# 准备提交（复制 DMG 并创建 .sha256 文件）
+prepare_commit() {
+    print_separator
+    echo_color "yellow" "Preparing to commit new version..."
+    print_separator
 
-# rename and replace
-function prepare_commit() {
-    printf "#%.0s" {1..60}
-    echo 
-    echo -e "## \033[1;33mPrepare to commit new version\033[0m"
-    printf "#%.0s" {1..60}
-    echo 
+    VERSION_DIR="WeChatMac/$VERSION"
+    mkdir -p "$VERSION_DIR"
 
-    mkdir -p WeChatMac/$dest_version
-    cp $temp_path/WeChatMac.dmg WeChatMac/$dest_version/WeChatMac-$dest_version.dmg
-    echo "DestVersion: $dest_version" > WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256
-    echo "Sha256: $now_sum256" >> WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256
-    echo "UpdateTime: $(date -u '+%Y-%m-%d %H:%M:%S') (UTC)" >> WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256
-    echo "DownloadFrom: $download_link" >> WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256
-    
+    cp "${TEMP_PATH}/WeChatMac.dmg" "$VERSION_DIR/WeChatMac-$VERSION.dmg"
+
+    NOW_SUM256=$(compute_sha256 "$VERSION_DIR/WeChatMac-$VERSION.dmg")
+
+    cat > "$VERSION_DIR/WeChatMac-$VERSION.dmg.sha256" <<EOF
+DestVersion: $VERSION
+Sha256: $NOW_SUM256
+UpdateTime: $(date -u '+%Y-%m-%d %H:%M:%S') (UTC)
+DownloadFrom: $DOWNLOAD_LINK
+EOF
+
+    echo "SHA256: $NOW_SUM256"
 }
 
-function clean_data() {
-    printf "#%.0s" {1..60}
-    echo 
-    echo -e "## \033[1;33mClean runtime and exit...\033[0m"
-    printf "#%.0s" {1..60}
-    echo 
+# 获取最新的 GitHub Release 信息
+get_latest_release_info() {
+    print_separator
+    echo_color "yellow" "Getting latest GitHub release info..."
+    print_separator
 
-    rm -rfv WeChatMac/*
-    exit $1
+    LATEST_BODY=$(gh release view --json body --jq ".body" || true)
+
+    if [ -z "$LATEST_BODY" ]; then
+        LATEST_SUM256=""
+        LATEST_VERSION=""
+    else
+        LATEST_SUM256=$(echo "$LATEST_BODY" | grep 'Sha256:' | awk -F': ' '{print $2}')
+        LATEST_VERSION=$(echo "$LATEST_BODY" | grep 'DestVersion:' | awk -F': ' '{print $2}')
+    fi
+
+    echo "Latest Version: $LATEST_VERSION"
+    echo "Latest SHA256: $LATEST_SUM256"
 }
 
-function main() {
-    # rm -rfv WeChatSetup/*
-    mkdir -p ${temp_path}/temp
-    # login_gh
-    ## https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-Readme.md
-    # install_depends
+# 创建新的 GitHub Release
+create_release() {
+    print_separator
+    echo_color "yellow" "Creating new GitHub release..."
+    print_separator
+
+    if [ "$VERSION" = "$LATEST_VERSION" ]; then
+        VERSION_TAG="${VERSION}_$(date -u '+%Y%m%d')"
+    else
+        VERSION_TAG="$VERSION"
+    fi
+
+    gh release create "v$VERSION_TAG" "WeChatMac/$VERSION/WeChatMac-$VERSION.dmg" -F "WeChatMac/$VERSION/WeChatMac-$VERSION.dmg.sha256" -t "Wechat For Mac v$VERSION_TAG"
+}
+
+# 清理临时数据并退出
+clean_data() {
+    print_separator
+    echo_color "yellow" "Cleaning runtime and exiting..."
+    print_separator
+
+    rm -rf "WeChatMac"
+    exit "$1"
+}
+
+# ====================================================
+# 主流程
+# ====================================================
+main() {
+    # 创建临时目录
+    mkdir -p "$TEMP_PATH"
+
+    # 安装依赖项
+    install_depends
+
+    # 下载 WeChat DMG
     download_wechat
 
-    now_sum256=`shasum -a 256 ${temp_path}/WeChatMac.dmg | awk '{print $1}'`
-    local latest_sum256=`gh release view  --json body --jq ".body" | awk '/Sha256/{ print $2 }'`
-    local latest_version=`gh release view  --json body --jq ".body" | awk '/DestVersion/{ print $2 }'`
-    if [ "$now_sum256" = "$latest_sum256" ]; then
-        >&2 echo -e "\n\033[1;32mThis is the newest Version!\033[0m\n"
+    # 提取版本信息
+    get_version
+
+    # 准备提交（复制 DMG 并创建 .sha256 文件）
+    prepare_commit
+
+    # 获取最新的 GitHub Release 信息
+    get_latest_release_info
+
+    # 比较 SHA256 值
+    if [ "$NOW_SUM256" = "$LATEST_SUM256" ] && [ -n "$LATEST_SUM256" ]; then
+        echo_color "green" "This is the newest Version!"
         clean_data 0
     fi
-    ## if not the newest
-    get_version
-    prepare_commit
-    # if dest_version is the same as latest_version
-    if [ "$dest_version" = "$latest_version" ]; then
-        version="$dest_version"_`date -u '+%Y%m%d'`
-        echo -e $dest_version
-    else
-        version="$dest_version"
-    fi
-    
-    gh release create v$version ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg -F ./WeChatMac/$dest_version/WeChatMac-$dest_version.dmg.sha256 -t "Wechat For Mac v$version"
 
-    # gh auth logout --hostname github.com | echo "y"
+    # 创建新的 GitHub Release
+    create_release
 
+    # 清理临时数据并退出
     clean_data 0
 }
 
+# 执行主流程
 main
-
