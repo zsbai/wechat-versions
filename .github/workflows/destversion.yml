@@ -20,4 +20,4 @@ jobs:
       - name: Check new version and push
         env: 
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: sudo apt update && sudo apt install python3 python3-pip -y && pip install lxml requests && bash -x ./scripts/destVersionForMac.sh ${{ github.event.inputs.download_link }}
+        run: bash -x ./scripts/destVersionForMac.sh ${{ github.event.inputs.download_link }}
