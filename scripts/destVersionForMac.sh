@@ -72,15 +72,28 @@ get_version() {
     # 使用 dmg2img 将 DMG 转换为 IMG
     dmg2img "${TEMP_PATH}/WeChatMac.dmg" "${TEMP_PATH}/WeChatMac.img"
 
+    set +e
     # 使用 7z x 解压 IMG 文件，保留目录结构
-    7z x "${TEMP_PATH}/WeChatMac.img" -o"${TEMP_PATH}" >/dev/null || {
-        echo_color "red" "Failed to extract IMG file."
+    7z x "${TEMP_PATH}/WeChatMac.img" -o"${TEMP_PATH}" >/dev/null
+    exit_code=$?
+
+    # 检查退出代码，忽略退出代码 2
+    if [ $exit_code -ne 0 ] && [ $exit_code -ne 2 ]; then
+        echo_color "red" "Failed to extract DMG file!"
         clean_data 1
-    }
+    else
+        echo_color "green" "Extraction completed successfully, ignoring warnings."
+    fi
+
+    if [ $exit_code -eq 2 ]; then
+        echo_color "yellow" "Warning: Exit code 2 ignored."
+        exit 0
+    fi
+    set -e
 
     # 查找 Info.plist
-    # INFO_PLIST=$(find "${TEMP_PATH}" -type f -name "Info.plist" | head -n 1)
-    INFO_PLIST=${TEMP_PATH}/微信\ WeChat/WeChat.app/Contents/Info.plist
+    INFO_PLIST=$(find "${TEMP_PATH}" -type f -name "Info.plist" | head -n 1)
+    # INFO_PLIST=${TEMP_PATH}/微信\ WeChat/WeChat.app/Contents/Info.plist
 
     if [ -z "$INFO_PLIST" ] || [ ! -f "$INFO_PLIST" ]; then
         echo_color "red" "Info.plist not found in the IMG!"
