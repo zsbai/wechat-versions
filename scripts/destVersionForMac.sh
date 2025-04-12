@@ -42,15 +42,10 @@ echo_color() {
 # 安装依赖项
 install_depends() {
     print_separator
-    echo_color "yellow" "Installing dependencies: 7zip, wget, curl, git, gh, dmg2img, shasum, pup"
+    echo_color "yellow" "Installing dependencies: wget, curl, git, gh, shasum, pup"
     print_separator
 
-    sudo apt update
-    sudo apt install -y p7zip-full p7zip-rar libdigest-sha-perl wget curl git gh dmg2img
-
-    curl -LO  https://github.com/ericchiang/pup/releases/download/v0.4.0/pup_v0.4.0_linux_amd64.zip
-	unzip pup_v0.4.0_linux_amd64.zip
-    sudo mv pup /usr/local/bin/
+    brew install wget curl git gh pup
 }
 
 # 下载 WeChat DMG
@@ -73,46 +68,32 @@ download_wechat() {
 # 从 Info.plist 提取版本信息
 get_version() {
     print_separator
-    echo_color "yellow" "Extracting version from Info.plist..."
+    echo_color "yellow" "Extracting version from DMG (macOS)..."
     print_separator
 
-    # 使用 dmg2img 将 DMG 转换为 IMG
-    dmg2img "${TEMP_PATH}/WeChatMac.dmg" "${TEMP_PATH}/WeChatMac.img"
+    # 挂载 dmg
+    MOUNT_DIR=$(hdiutil attach "${TEMP_PATH}/WeChatMac.dmg" -nobrowse | sed -n 's/^.*\(\/Volumes\/.*\)$/\1/p' | tail -n1)
 
-    set +e
-    # 使用 7z x 解压 IMG 文件，保留目录结构
-    7z x "${TEMP_PATH}/WeChatMac.img" -o"${TEMP_PATH}" >/dev/null
-    exit_code=$?
-
-    # 检查退出代码，忽略退出代码 2
-    if [ $exit_code -ne 0 ] && [ $exit_code -ne 2 ]; then
-        echo_color "red" "Failed to extract DMG file!"
+    if [ -z "$MOUNT_DIR" ]; then
+        echo_color "red" "Failed to mount DMG!"
         clean_data 1
-    else
-        echo_color "green" "Extraction completed successfully, ignoring warnings."
     fi
 
-    if [ $exit_code -eq 2 ]; then
-        echo_color "yellow" "Warning: Exit code 2 ignored."
-        exit 0
-    fi
-    set -e
+    # 定位 Info.plist
+    # INFO_PLIST=$(find "${MOUNT_DIR}" -type f -name "Info.plist" | head -n 1)
+    INFO_PLIST="${MOUNT_DIR}/WeChat.app/Contents/Info.plist"
 
-    # 查找 Info.plist
-    INFO_PLIST=$(find "${TEMP_PATH}" -type f -name "Info.plist" | head -n 1)
-    # INFO_PLIST=${TEMP_PATH}/微信\ WeChat/WeChat.app/Contents/Info.plist
-
-    if [ -z "$INFO_PLIST" ] || [ ! -f "$INFO_PLIST" ]; then
-        echo_color "red" "Info.plist not found in the IMG!"
+    if [ ! -f "$INFO_PLIST" ]; then
+        echo_color "red" "Info.plist not found in mounted volume!"
+        hdiutil detach "$MOUNT_DIR"
         clean_data 1
     fi
 
     # 使用 grep 和 sed 提取版本号
     VERSION=$(grep -A1 '<key>CFBundleShortVersionString</key>' "$INFO_PLIST" | grep '<string>' | sed -E 's/.*<string>([^<]+)<\/string>.*/\1/')
 
-    if [ -z "$VERSION" ]; then
-        VERSION=$(grep -A1 '<key>CFBundleVersion</key>' "$INFO_PLIST" | grep '<string>' | sed -E 's/.*<string>([^<]+)<\/string>.*/\1/')
-    fi
+    # 卸载 dmg
+    hdiutil detach "$MOUNT_DIR"
 
     if [ -z "$VERSION" ]; then
         echo_color "red" "Version information not found in Info.plist!"
@@ -121,6 +102,7 @@ get_version() {
 
     echo "Version: $VERSION"
 }
+
 
 # 计算 SHA256
 compute_sha256() {

@@ -4,15 +4,10 @@ on:
   schedule:
     - cron: '0 7 * * *'
   workflow_dispatch:
-    inputs:
-      download_link:
-        description: 'The manual WechatSetup.exe download link'
-        required: false
-        default: 'https://dldir1.qq.com/weixin/mac/WeChatMac.dmg'
 
 jobs:
   save_new_wechat:
-    runs-on: ubuntu-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v2
       # - name: Test Github Action Server Time
