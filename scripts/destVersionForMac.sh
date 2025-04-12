@@ -6,7 +6,8 @@ set -eo pipefail
 # 配置变量
 # ====================================================
 TEMP_PATH="WeChatMac/temp"
-DOWNLOAD_LINK="${1:-https://dldir1.qq.com/weixin/mac/WeChatMac.dmg}"
+WEBSITE_URL="https://mac.weixin.qq.com/?t=mac&lang=zh_CN"
+DOWNLOAD_LINK=""
 
 # ====================================================
 # 函数定义
@@ -41,15 +42,17 @@ echo_color() {
 # 安装依赖项
 install_depends() {
     print_separator
-    echo_color "yellow" "Installing dependencies: 7zip, wget, curl, git, gh, dmg2img, shasum"
+    echo_color "yellow" "Installing dependencies: 7zip, wget, curl, git, gh, dmg2img, shasum, pup"
     print_separator
 
     sudo apt update
-    sudo apt install -y p7zip-full p7zip-rar libdigest-sha-perl wget curl git gh dmg2img
+    sudo apt install -y p7zip-full p7zip-rar libdigest-sha-perl wget curl git gh dmg2img pup
 }
 
 # 下载 WeChat DMG
 download_wechat() {
+    DOWNLOAD_LINK=$(curl -s "$WEBSITE_URL" | pup 'a.download-button:nth-of-type(1) attr{href}')
+    
     print_separator
     echo_color "yellow" "Downloading the newest WeChatMac..."
     print_separator
