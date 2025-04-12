@@ -46,7 +46,11 @@ install_depends() {
     print_separator
 
     sudo apt update
-    sudo apt install -y p7zip-full p7zip-rar libdigest-sha-perl wget curl git gh dmg2img pup
+    sudo apt install -y p7zip-full p7zip-rar libdigest-sha-perl wget curl git gh dmg2img
+
+    curl -LO  https://github.com/ericchiang/pup/releases/download/v0.4.0/pup_v0.4.0_linux_amd64.zip
+	unzip pup_v0.4.0_linux_amd64.zip
+    sudo mv pup /usr/local/bin/
 }
 
 # 下载 WeChat DMG
