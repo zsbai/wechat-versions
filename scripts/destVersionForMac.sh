@@ -92,6 +92,9 @@ get_version() {
     # 使用 grep 和 sed 提取版本号
     VERSION=$(grep -A1 '<key>CFBundleShortVersionString</key>' "$INFO_PLIST" | grep '<string>' | sed -E 's/.*<string>([^<]+)<\/string>.*/\1/')
 
+    # 使用 grep 和 sed 提取构建版本号
+    BUILD_VERSION=$(grep -A1 '<key>CFBundleVersion</key>' "$INFO_PLIST" | grep '<string>' | sed -E 's/.*<string>([^<]+)<\/string>.*/\1/')
+
     # 卸载 dmg
     hdiutil detach "$MOUNT_DIR"
 
@@ -125,6 +128,7 @@ prepare_commit() {
 
     cat > "$VERSION_DIR/WeChatMac-$VERSION.dmg.sha256" <<EOF
 DestVersion: $VERSION
+DestBuild: $BUILD_VERSION
 Sha256: $NOW_SUM256
 UpdateTime: $(date -u '+%Y-%m-%d %H:%M:%S') (UTC)
 DownloadFrom: $DOWNLOAD_LINK
