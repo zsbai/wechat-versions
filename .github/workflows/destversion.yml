@@ -4,15 +4,20 @@ on:
   schedule:
     - cron: '0 7 * * *'
   workflow_dispatch:
+    inputs:
+      force_release:
+        description: 'Force create release (ignore version checks)'
+        type: boolean
+        default: false
 
 jobs:
   save_new_wechat:
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v2
-      # - name: Test Github Action Server Time
-      #   run: echo `date`
+
       - name: Check new version and push
         env: 
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash -x ./scripts/destVersionForMac.sh ${{ github.event.inputs.download_link }}
+          FORCE_RELEASE: ${{ github.event.inputs.force_release }}
+        run: python3 ./scripts/destVersionForMac.py
