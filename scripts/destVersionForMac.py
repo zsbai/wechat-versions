@@ -92,11 +92,22 @@ def fetch_head_metadata(url: str) -> dict[str, str]:
     Returns:
         dict[str, str]: 从 HEAD 响应中提取的元数据字典，键为小写字符串，值为对应的响应头值
     """
-
     # Use HEAD request to read metadata from the direct file link.
-    request = urllib.request.Request(url, method="HEAD")
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return {key.lower(): value.strip() for key, value in response.headers.items()}
+    attempts = 2
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            request = urllib.request.Request(url, method="HEAD")
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return {key.lower(): value.strip() for key, value in response.headers.items()}
+        except Exception as exc:
+            last_error = exc
+            if attempt < attempts:
+                log(f"HEAD request failed (attempt {attempt}). Waiting before retry...")
+                time.sleep(10)
+    if last_error:
+        log(f"HEAD request failed after {attempts} attempts: {last_error}")
+        return {}
 
 def download_with_retry(url: str, dest: Path) -> None:
     """
